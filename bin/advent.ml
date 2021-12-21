@@ -139,11 +139,6 @@ module Day21 = struct
       done;
       IntMap.bindings !a
 
-    let () =
-      Format.printf "%a@\n"
-        (printl (fun fmt (v, _) -> Format.fprintf fmt "%d " v))
-        sums
-
     let play_turns (pos, score) =
       List.map
         (fun (nmove, mul) ->
