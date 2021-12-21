@@ -1,3 +1,91 @@
+open Lib
+
+module Day21 = struct
+  let nroll_by_turn = 3
+
+  module Part1 = struct
+    let roll_dice dice =
+      let rec aux dice move nroll =
+        if nroll = nroll_by_turn then (move, dice)
+        else
+          let dice = dice + 1 in
+          let dice = if dice = 101 then 1 else dice in
+          aux dice (move + dice) (nroll + 1)
+      in
+      aux dice 0 0
+
+    let move pos nmove =
+      let move_mod = (nmove + pos) mod 10 in
+      if move_mod = 0 then 10 else move_mod
+
+    let play_turn total_roll dice (pos, score) =
+      let nmove, dice = roll_dice dice in
+      let pos = move pos nmove in
+      (total_roll + nroll_by_turn, dice, (pos, score + pos))
+
+    let play_game p1_pos p2_pos =
+      let rec aux dice total_roll p1 p2 =
+        if snd p1 >= 1000 then (total_roll, snd p2)
+        else if snd p2 >= 1000 then (total_roll, snd p1)
+        else
+          let total_roll, dice, p1 = play_turn total_roll dice p1 in
+          aux dice total_roll p2 p1
+      in
+      aux 0 0 (p1_pos, 0) (p2_pos, 0)
+  end
+
+  module Part2 = struct
+    let sums =
+      let a = ref IntMap.empty in
+      for i = 1 to 3 do
+        for j = 1 to 3 do
+          for k = 1 to 3 do
+            a :=
+              IntMap.update
+                (i + j + k)
+                (function Some prev -> Some (prev + 1) | None -> Some 1)
+                !a
+          done
+        done
+      done;
+      IntMap.bindings !a
+
+    let play_turns (pos, score) =
+      List.map
+        (fun (nmove, mul) ->
+          let pos = Part1.move pos nmove in
+          ((pos, pos + score), mul))
+        sums
+
+    let play_game p1_pos p2_pos =
+      let aux aux (is_p1, p1, p2) =
+        if snd p1 >= 21 then if is_p1 then (1, 0) else (0, 1)
+        else if snd p2 >= 21 then if is_p1 then (0, 1) else (1, 0)
+        else
+          let p1_universes = play_turns p1 in
+          List.fold_left
+            (fun (p1win_acc, p2win_acc) (p1, mul) ->
+              let p1win, p2win = aux (not is_p1, p2, p1) in
+              ((p1win * mul) + p1win_acc, p2win + p2win_acc))
+            (0, 0) p1_universes
+      in
+      let aux = memo_rec (Hashtbl.create 17) aux in
+      let p1win, p2win = aux (true, (p1_pos, 0), (p2_pos, 0)) in
+      max p1win p2win
+  end
+
+  let run () =
+    let p1 = 10 in
+    let p2 = 9 in
+
+    let total_roll, loser_score = Part1.play_game p1 p2 in
+    Format.printf "%d * %d = %d @\n" total_roll loser_score
+      (total_roll * loser_score);
+
+    Format.printf "%d@\n" (Part2.play_game p1 p2);
+    ()
+end
+
 module Day20 = struct
   let img_of_string strl =
     List.map
@@ -604,7 +692,7 @@ module Day15 = struct
             if r mod 9 = 0 then 9 else r mod 9))
 
   let run () =
-    let grid = parse_matrix "day15.txt" in
+    let grid = parse_matrix num_of_char "day15.txt" in
     let grid = unfold_grid grid in
     Format.printf "%d@\n"
       (shortest_path grid (0, 0)
@@ -655,7 +743,7 @@ module Day14 = struct
 
     let most_least_in_htbl h =
       Hashtbl.fold
-        (fun k v (((mostc, mostv) as most), ((leastc, leastv) as least)) ->
+        (fun k v (((_mostc, mostv) as most), ((_leastc, leastv) as least)) ->
           if v > mostv then ((k, v), least)
           else if v < leastv then (most, (k, v))
           else (most, least))
@@ -690,7 +778,7 @@ module Day14 = struct
 
     let most_least m =
       CharMap.fold
-        (fun k v (((mostc, mostv) as most), ((leastc, leastv) as least)) ->
+        (fun k v (((_mostc, mostv) as most), ((_leastc, leastv) as least)) ->
           if v > mostv then ((k, v), least)
           else if v < leastv then (most, (k, v))
           else (most, least))
@@ -704,7 +792,7 @@ module Day14 = struct
         rules;
       let meet = Hashtbl.create 17 in
       let merge =
-        CharMap.merge (fun k a b ->
+        CharMap.merge (fun _k a b ->
             match (a, b) with
             | Some a, Some b -> Some (a + b)
             | Some a, _ | _, Some a -> Some a
@@ -715,7 +803,7 @@ module Day14 = struct
           | None -> Some 1
           | Some v -> Some (v + 1))
       in
-      let aux aux (n, ((k1, k2) as init)) =
+      let aux aux (n, init) =
         if n >= max then CharMap.empty
         else
           let ((_, new_c) as p1), p2 = Hashtbl.find graph init in
@@ -741,9 +829,6 @@ module Day14 = struct
     let (mostc, mostv), (leastc, leastv) = Part2.apply_rules_n 59 rules init in
     Format.printf "most: %c, %d times@\nleast: %c, %d times@\nres: %d @\n" mostc
       mostv leastc leastv (mostv - leastv)
-  ;;
-
-  run ()
 end
 
 module Day13 = struct
@@ -792,7 +877,9 @@ module Day13 = struct
     in
     let a = Array.make_matrix (max_y + 1) (max_x + 1) false in
     PtSet.iter (fun (x, y) -> a.(y).(x) <- true) points;
-    print_mat (fun v -> if v then "#" else ".") a
+    Format.printf "%a"
+      (print_mat (fun fmt v -> Format.fprintf fmt "%s" (if v then "#" else ".")))
+      a
 
   let run () =
     let pts, folds = parse "day13.txt" in
@@ -850,17 +937,8 @@ module Day12 = struct
 
   let run () =
     let graph = parse "day12.txt" in
-    Hashtbl.iter
-      (fun k v ->
-        Format.printf "%s " k;
-        printl (fun x -> x) v;
-        Format.printf "")
-      graph;
     let paths = List.rev_map List.rev @@ explore graph in
     List.length paths |> Format.printf "%d\n"
-  ;;
-
-  run ()
 end
 
 module Day11 = struct
@@ -924,8 +1002,7 @@ module Day11 = struct
     aux 1 0
 
   let run () =
-    let board = parse_matrix "day11.txt" in
-    print_mat string_of_int board;
+    let board = parse_matrix num_of_char "day11.txt" in
     try run_steps board 400 |> Format.printf "flashes: %d\n"
     with Exitv n -> Format.printf "Everyone flashed step %d\n" n
 end
@@ -1157,14 +1234,12 @@ module Day8 = struct
     compute r |> print_int;
     print_endline "";
     ()
-
-  let () = run ()
 end
 
 module Day7 = struct
   let parse file =
     foldf
-      (fun acc l ->
+      (fun _ l ->
         String.split_on_char ',' l |> List.map int_of_string
         |> List.sort compare |> Array.of_list)
       [||] file
@@ -1201,7 +1276,7 @@ end
 module Day6 = struct
   let parse file =
     foldf
-      (fun acc l ->
+      (fun _ l ->
         String.split_on_char ',' l |> List.map int_of_string
         |> List.sort compare)
       [] file
@@ -1217,7 +1292,7 @@ module Day6 = struct
     let fresh_q = Array.make 2 0 in
     List.iter (fun e -> q.(e) <- q.(e) + 1) init;
     let rec round n =
-      let rec play_round cycle cycle_fresh =
+      let play_round cycle cycle_fresh =
         let current_q = q.(cycle) in
         (* add fresh fishes to the main queue *)
         q.(cycle) <- q.(cycle) + fresh_q.(cycle_fresh);
@@ -1242,7 +1317,7 @@ module Day5 = struct
   (** add points by moving from p1 to p2
       and return the number of new collision *)
   let rec add_points h acc p1 p2 =
-    let colision, acc =
+    let _colision, acc =
       match Hashtbl.find_opt h p1 with
       (* already in colision *)
       | Some true -> (false, acc)
@@ -1420,8 +1495,8 @@ module Day3 = struct
     in
     (* replace by most used *)
     let gamma_arr =
-      Array.mapi
-        (fun i nb_zero -> if nb_zero > nb_lines / 2 then 0 else 1)
+      Array.map
+        (fun nb_zero -> if nb_zero > nb_lines / 2 then 0 else 1)
         nb_zero_arr
     in
     let epsilon = from_base_2 @@ inverse gamma_arr in
@@ -1500,7 +1575,7 @@ module Day2 = struct
 
   let run () =
     print_endline "Day 2";
-    let { h_pos; depth } = compute_location "day2.txt" in
+    let { h_pos; depth; _ } = compute_location "day2.txt" in
     Format.printf "Location: %d, %d\n" h_pos depth;
     Format.printf "Result: %d\n" (h_pos * depth)
 end

@@ -1,4 +1,4 @@
 (executable
  (public_name aoc)
- (name advent)
+ (name main)
  (libraries batteries bitv unionFind))
