@@ -5,13 +5,36 @@ module CharSet = Set.Make (Char)
 module CharSetMap = Map.Make (CharSet)
 module FloatSet = Set.Make (Float)
 
+let ( @: ) e l = e :: l
+
+let ( @? ) e l = match e with None -> l | Some e -> e :: l
+
+type point = int * int [@@deriving show]
+
+type point3d = int * int * int [@@deriving show]
+
 module Point = struct
-  type t = int * int
+  type t = point
 
   let compare = compare
 end
 
+module Point3D = struct
+  type t = point3d
+
+  let compare = compare
+end
+
+type range = { low : int; up : int } [@@deriving show]
+
 module PtSet = Set.Make (Point)
+module Pt3DMap = Map.Make (Point3D)
+module Pt3DSet = Set.Make (Point3D)
+
+let pp_int fmt i = Format.fprintf fmt "%d" i
+
+let print_couple printx printy fmt (x, y) =
+  Format.fprintf fmt "(%a, %a)" printx x printy y
 
 exception Exitv of int
 

@@ -1,4 +1,598 @@
 open Lib
+open Format
+
+module Day25 = struct
+  type sc = R | D
+
+  let parse file =
+    parse_matrix
+      (fun c -> if c = '>' then Some R else if c = 'v' then Some D else None)
+      file
+
+  let prev dim coord = if coord = 0 then dim - 1 else coord - 1
+
+  let next dim coord = (coord + 1) mod dim
+
+  let left m x y = m.(y).(prev (Array.length m.(0)) x)
+
+  let right m x y = m.(y).(next (Array.length m.(0)) x)
+
+  let up m x y = m.(prev (Array.length m) y).(x)
+
+  let down m x y = m.(next (Array.length m) y).(x)
+
+  let downleft m x y = m.(next (Array.length m) y).(prev (Array.length m.(0)) x)
+
+  let downright m x y =
+    m.(next (Array.length m) y).(next (Array.length m.(0)) x)
+
+  let next m =
+    let updated = ref false in
+    let new_m =
+      Array.init (Array.length m) (fun y ->
+          Array.init
+            (Array.length m.(0))
+            (fun x ->
+              let nextval =
+                match m.(y).(x) with
+                | None ->
+                    if left m x y = Some R then Some R
+                    else if up m x y = Some D then Some D
+                    else None
+                | Some R ->
+                    if right m x y = None then
+                      if up m x y = Some D then Some D else None
+                    else Some R
+                | Some D ->
+                    if
+                      (down m x y = Some R && downright m x y = None)
+                      || (down m x y = None && downleft m x y <> Some R)
+                    then None
+                    else Some D
+              in
+              if nextval <> m.(y).(x) then updated := true;
+              nextval))
+    in
+    (new_m, !updated)
+
+  let next_n max m =
+    let rec aux n m =
+      if n = max then (m, n)
+      else
+        let next_m, updated = next m in
+        if not updated then (next_m, n) else aux (n + 1) next_m
+    in
+    aux 0 m
+
+  let run () =
+    let m = parse "day25.txt" in
+    let next_m, after_n = next_n 1000 m in
+    printf "after %d@." (after_n + 1);
+    ()
+end
+
+module Day23 = struct
+  type room = { id : int; a : char option Parray.t }
+
+  type t = { board : char option Parray.t; rooms : room Parray.t }
+
+  type problem = t
+
+  let mk_room ~a id =
+    { id; a = Parray.of_array @@ Array.map (fun a -> Some a) a }
+
+  let room_of_pod = function
+    | 'A' -> 2
+    | 'B' -> 4
+    | 'C' -> 6
+    | 'D' -> 8
+    | _ -> assert false
+
+  let cost_of_pod = function
+    | 'A' -> 1
+    | 'B' -> 10
+    | 'C' -> 100
+    | 'D' -> 1000
+    | _ -> assert false
+
+  let room_id_to_tid id =
+    match id with 2 -> 0 | 4 -> 1 | 6 -> 2 | 8 -> 3 | _ -> assert false
+
+  let get_room rooms id = Parray.get rooms (room_id_to_tid id)
+
+  let get_from_room rooms id i =
+    Parray.get (Parray.get rooms (room_id_to_tid id)).a i
+
+  type loc = Room of int * int | Board of int
+  [@@deriving show { with_path = false }]
+
+  type move = char * loc * loc * int [@@deriving show { with_path = false }]
+
+  type moves = move list [@@deriving show { with_path = false }]
+
+  let is_room = function Room _ -> true | Board _ -> false
+
+  (* #D#C#B#A#
+   * #D#B#A#C# *)
+
+  let input =
+    {
+      board = Parray.create 11 None;
+      rooms =
+        Parray.of_array
+          [|
+            mk_room ~a:[| 'D'; 'D'; 'D'; 'C' |] 2;
+            mk_room ~a:[| 'D'; 'C'; 'B'; 'C' |] 4;
+            mk_room ~a:[| 'A'; 'B'; 'A'; 'B' |] 6;
+            mk_room ~a:[| 'A'; 'A'; 'C'; 'B' |] 8;
+          |];
+    }
+
+  let test =
+    {
+      board =
+        Parray.of_array
+          [|
+            Some 'D';
+            Some 'C';
+            None;
+            Some 'A';
+            None;
+            Some 'D';
+            None;
+            Some 'D';
+            None;
+            Some 'D';
+            Some 'A';
+          |];
+      rooms =
+        Parray.of_array
+          [|
+            { id = 2; a = Parray.of_array [| None; None; None; None |] };
+            {
+              id = 4;
+              a = Parray.of_array [| None; Some 'C'; Some 'B'; Some 'A' |];
+            };
+            {
+              id = 6;
+              a = Parray.of_array [| None; Some 'B'; Some 'A'; Some 'B' |];
+            };
+            {
+              id = 8;
+              a = Parray.of_array [| None; Some 'A'; Some 'C'; Some 'B' |];
+            };
+          |];
+    }
+
+  let example =
+    {
+      board = Parray.create 11 None;
+      rooms =
+        Parray.of_array
+          [|
+            mk_room ~a:[| 'B'; 'D'; 'D'; 'A' |] 2;
+            mk_room ~a:[| 'C'; 'C'; 'B'; 'D' |] 4;
+            mk_room ~a:[| 'B'; 'B'; 'A'; 'C' |] 6;
+            mk_room ~a:[| 'D'; 'A'; 'C'; 'A' |] 8;
+          |];
+    }
+
+  let fold_problem f acc p =
+    let acc =
+      Parray.fold_left
+        (fun (i, acc) pod -> (i + 1, (f acc (Board i)) pod))
+        (0, acc) p.board
+      |> snd
+    in
+    Parray.fold_left
+      (fun acc room ->
+        Parray.fold_left
+          (fun (i, acc) v -> (i + 1, f acc (Room (room.id, i)) v))
+          (0, acc) room.a
+        |> snd)
+      acc p.rooms
+
+  let print_problem p =
+    let mat = Array.make_matrix 5 11 ' ' in
+    fold_problem
+      (fun () loc c ->
+        let c = Option.value c ~default:'.' in
+        match loc with
+        | Room (x, i) -> mat.(i + 1).(x) <- c
+        | Board x -> mat.(0).(x) <- c)
+      () p;
+    printf "%a@." (print_mat (fun fmt -> fprintf fmt "%c")) mat
+
+  let free_loc p loc =
+    match loc with
+    | Room (id, i) -> get_from_room p.rooms id i = None
+    | Board x -> Parray.get p.board x = None
+
+  let forall_room p pred destid =
+    Parray.for_alli pred (get_room p.rooms destid).a
+
+  let exists_room p pred destid =
+    Parray.existsi pred (get_room p.rooms destid).a
+
+  let room_path_free p (destid, desti) =
+    forall_room p (fun i v -> i >= desti || v = None) destid
+
+  let room_path_free_and_open p pod (destid, desti) =
+    forall_room p
+      (fun i v -> (i > desti && v = Some pod) || (i <= desti && v = None))
+      destid
+
+  let get_x = function Board x -> x | Room (x, _) -> x
+
+  let valid_dest cond p pod origin dest =
+    origin <> dest && free_loc p dest
+    &&
+    match dest with
+    | Board (2 | 4 | 6 | 8) -> false
+    | Board _ -> is_room origin
+    | Room (id, b) ->
+        let not_same_room =
+          match origin with Room (id', _) -> id' <> id | Board _ -> true
+        in
+
+        if cond then
+          printf "not_same:%B@\neq:%B@\nfree_open: %B@." not_same_room
+            (room_of_pod pod = id)
+            (room_path_free_and_open p pod (id, b));
+
+        not_same_room
+        && room_of_pod pod = id
+        && room_path_free_and_open p pod (id, b)
+
+  let free_in_room p origin =
+    match origin with
+    | Room (id, i) -> room_path_free p (id, i)
+    | Board _ -> true
+
+  let path_free p origin dest =
+    match (origin, dest) with
+    | Board _, Board _ -> false
+    | Room (xorig, _), Board xdest
+    | Board xorig, Room (xdest, _)
+    | Room (xorig, _), Room (xdest, _) ->
+        let down, up =
+          if xorig < xdest then (xorig, xdest) else (xdest, xorig)
+        in
+        Parray.for_alli
+          (fun boardx v -> boardx <= down || boardx >= up || v = None)
+          p.board
+
+  let valid_origin p pod origin =
+    match origin with
+    | Board _ -> true
+    | Room (orig_id, orig_i) ->
+        room_of_pod pod <> orig_id
+        || exists_room p
+             (fun _ v -> Option.map room_of_pod v <> Some orig_id)
+             orig_id
+
+  let path_exists p pod origin dest =
+    let _cond =
+      forall_room p (fun _ v -> v = None) 2
+      (* && Parray.get p.board 3 = Some 'A' *)
+      && origin = Board 3
+      && dest = Room (2, 3)
+      && pod = 'A'
+    in
+    (* if cond then (
+     *   print_problem p;
+     *   printf "%c %a -> %a %B %B %B %B@." pod pp_loc origin pp_loc dest
+     *     (valid_origin p pod origin)
+     *     (valid_dest cond p pod origin dest)
+     *     (free_in_room p origin) (path_free p origin dest)); *)
+    valid_origin p pod origin
+    && valid_dest false p pod origin dest
+    && free_in_room p origin && path_free p origin dest
+
+  let score p =
+    fold_problem
+      (fun acc loc c ->
+        match loc with
+        | Room (x, _) ->
+            if Some x = Option.map room_of_pod c then acc + 10 else acc
+        | Board _ -> acc)
+      0 p
+
+  let victory score = score = 160
+
+  let dist origin dest =
+    let dist loc =
+      match loc with Room (x, i) -> (x, 1 + i) | Board x -> (x, 0)
+    in
+    let xorig, orig = dist origin in
+    let xdest, dest = dist dest in
+    abs (xdest - xorig) + dest + orig
+
+  let all_moves p =
+    fold_problem
+      (fun acc origin pod ->
+        match pod with
+        | None -> acc
+        | Some pod ->
+            fold_problem
+              (fun acc dest _ ->
+                let path_exists = path_exists p pod origin dest in
+                if path_exists then (pod, origin, dest, dist origin dest) :: acc
+                else acc)
+              acc p)
+      [] p
+
+  let update_loc board rooms loc v =
+    match loc with
+    | Room (id, i) ->
+        let tid =
+          match id with 2 -> 0 | 4 -> 1 | 6 -> 2 | 8 -> 3 | _ -> assert false
+        in
+        let a = Parray.set (get_room rooms id).a i v in
+        let room = { (get_room rooms id) with a } in
+        (board, Parray.set rooms tid room)
+    | Board x -> (Parray.set board x v, rooms)
+
+  let apply_move p (pod, origin, dest, dist) =
+    let board, rooms = update_loc p.board p.rooms origin None in
+    let board, rooms = update_loc board rooms dest (Some pod) in
+    ({ board; rooms }, dist * cost_of_pod pod)
+
+  module Board = struct
+    type t = problem * int * int
+
+    let compare (_, cost1, score1) (_, cost2, score2) =
+      let comp = compare score2 score1 in
+      if comp = 0 then compare cost1 cost2 else comp
+  end
+
+  module Heap = BatHeap.Make (Board)
+
+  module Ptbl = Hashtbl.Make (struct
+    type t = problem
+
+    let to_string t =
+      String.init 27 (fun i ->
+          match i with
+          | i when i < 11 -> Option.value (Parray.get t.board i) ~default:' '
+          | i when i < 15 ->
+              Option.value (get_from_room t.rooms 2 (i - 11)) ~default:' '
+          | i when i < 19 ->
+              Option.value (get_from_room t.rooms 4 (i - 15)) ~default:' '
+          | i when i < 23 ->
+              Option.value (get_from_room t.rooms 6 (i mod 19)) ~default:' '
+          | i when i < 27 ->
+              Option.value (get_from_room t.rooms 8 (i mod 23)) ~default:' '
+          | i -> assert false)
+
+    let hash t = Hashtbl.hash @@ to_string t
+
+    let equal t1 t2 = to_string t1 = to_string t2
+  end)
+
+  let apply_moves min_cost h total_cost next_moves p =
+    let moves = all_moves p in
+    List.fold_left
+      (fun acc move ->
+        let p, cost = apply_move p move in
+        let cost = cost + total_cost in
+        let need_computation =
+          match Ptbl.find h p with
+          | cost' -> cost' > cost
+          | exception Not_found -> true
+        in
+        if need_computation then
+          let pscore = score p in
+          Heap.insert acc (p, cost, pscore)
+        else acc)
+      next_moves moves
+
+  let compute p =
+    let min_cost = ref max_int in
+    let h = Ptbl.create 217 in
+    let init_moves = apply_moves !min_cost h 0 Heap.empty p in
+    let rec aux acc next_moves =
+      match Heap.find_min next_moves with
+      | exception Invalid_argument _ -> acc
+      | p, cost, pscore ->
+          let next_moves = Heap.del_min next_moves in
+          if cost >= !min_cost then aux acc next_moves
+          else (
+            Ptbl.add h p cost;
+            if victory pscore then (
+              let acc = cost :: acc in
+              min_cost := cost;
+              printf "vic: %d %d @." !min_cost (Heap.size next_moves);
+              aux acc next_moves)
+            else
+              let next_moves = apply_moves !min_cost h cost next_moves p in
+              aux acc next_moves)
+    in
+    aux [] init_moves
+
+  let run () =
+    printf "day23@\n";
+
+    (* let _moves = all_moves test in *)
+    print_problem input;
+    let all_res = compute input in
+    let res = List.sort_uniq compare all_res in
+    printf "min: %s@\n" ([%derive.show: int list] res);
+    ()
+end
+
+module Day22 = struct
+  type status = On | Off [@@deriving show]
+
+  let parse file =
+    foldf
+      (fun acc line ->
+        Scanf.sscanf line "%s x=%d..%d,y=%d..%d,z=%d..%d"
+          (fun status xmin xmax ymin ymax zmin zmax ->
+            ( (if status = "on" then On else Off),
+              { low = xmin; up = xmax },
+              { low = ymin; up = ymax },
+              { low = zmin; up = zmax } )
+            :: acc))
+      [] file
+    |> List.rev
+
+  let print_reboot_step fmt (status, x, y, z) =
+    Format.fprintf fmt "%s x=%d..%d,y=%d..%d,z=%d..%d@."
+      (match status with Off -> "off" | On -> "on")
+      x.low x.up y.low y.up z.low z.up
+
+  module Part1 = struct
+    let apply_reboot_step (status, x, y, z) points =
+      let points = ref points in
+      for x = x.low to x.up do
+        for y = y.low to y.up do
+          for z = z.low to z.up do
+            points :=
+              match status with
+              | On -> Pt3DSet.add (x, y, z) !points
+              | Off -> Pt3DSet.remove (x, y, z) !points
+          done
+        done
+      done;
+      !points
+
+    let reboot =
+      List.fold_left (fun acc step -> apply_reboot_step step acc) Pt3DSet.empty
+  end
+
+  module Part2 = struct
+    let has_inter r1 r2 = r1.low <= r2.up && r1.up >= r2.low
+
+    let contains ~cont r = r.low >= cont.low && r.up <= cont.up
+
+    let contains3d ~cont:(x1, y1, z1) (x2, y2, z2) =
+      contains ~cont:x1 x2 && contains ~cont:y1 y2 && contains ~cont:z1 z2
+
+    let has_inter3d (x1, y1, z1) (x2, y2, z2) =
+      has_inter x1 x2 && has_inter y1 y2 && has_inter z1 z2
+
+    let card r = r.up - r.low + 1
+
+    let non_empty low up =
+      let range = { low; up } in
+      if card range <= 0 then None else Some range
+
+    type range3d = range * range * range [@@deriving show]
+
+    type ranges3d = range3d list [@@deriving show]
+
+    let merge r1 r2 =
+      let r =
+        if r2.low >= r1.low && r2.up <= r1.up then
+          (* r1  -----------------
+           * r2     ------- *)
+          non_empty r1.low (r2.low - 1) @? non_empty (r2.up + 1) r1.up @? [ r2 ]
+        else if r1.low >= r2.low && r1.up <= r2.up then
+          (* r1      ------
+           * r2   ------------- *)
+          non_empty r2.low (r1.low - 1) @? non_empty (r1.up + 1) r2.up @? [ r1 ]
+        else if r1.low >= r2.low && r1.up >= r2.up then
+          (* r1       ------------------
+           * r2 ------------- *)
+          non_empty (r2.up + 1) r1.up @? non_empty r2.low (r1.low - 1) @? [ r2 ]
+        else
+          (* r1 ------------------
+           * r2            ------------- *)
+          non_empty r1.low (r2.low - 1)
+          @? non_empty (r1.up + 1) r2.up
+          @? non_empty r2.low r1.up @? []
+      in
+      r
+
+    let prod cond xl yl zl =
+      List.fold_left
+        (fun acc x ->
+          List.fold_left
+            (fun acc y ->
+              List.fold_left
+                (fun acc z ->
+                  let i = (x, y, z) in
+                  if cond i then i :: acc else acc)
+                acc zl)
+            acc yl)
+        [] xl
+
+    let rec add_to_intervals is is_to_add =
+      match is with
+      | ((hx, hy, hz) as h) :: t ->
+          let to_add_filtered, rem = List.partition (has_inter3d h) is_to_add in
+          if to_add_filtered <> [] then
+            let result =
+              List.fold_left
+                (fun r ((x, y, z) as i) ->
+                  let rx' = merge hx x in
+                  let ry' = merge hy y in
+                  let rz' = merge hz z in
+                  let r' =
+                    prod
+                      (fun i' ->
+                        contains3d ~cont:i i' && not (contains3d ~cont:h i'))
+                      rx' ry' rz'
+                  in
+                  r @ r')
+                rem to_add_filtered
+            in
+            h :: add_to_intervals t result
+          else h :: add_to_intervals t is_to_add
+      | [] -> is_to_add
+
+    let rec sub (r, rem) cuboids to_remove =
+      match (cuboids, to_remove) with
+      | ((hx, hy, hz) as h) :: hs, ((ix, iy, iz) as i) :: is ->
+          if has_inter3d h i then
+            let rx' = merge hx ix in
+            let ry' = merge hy iy in
+            let rz' = merge hz iz in
+            let prod_res =
+              prod
+                (fun i' ->
+                  (contains3d ~cont:h i' && not (contains3d ~cont:i i'))
+                  || (contains3d ~cont:i i' && not (contains3d ~cont:h i')))
+                rx' ry' rz'
+            in
+            let h_cuboids, i_rem =
+              List.partition (fun i' -> contains3d ~cont:h i') prod_res
+            in
+            let h_cuboids, is = sub (r, i_rem @ rem) h_cuboids is in
+            sub (h_cuboids, []) hs is
+          else
+            let r, rem = sub (r, i :: rem) [ h ] is in
+            sub (r, []) hs rem
+      | [], is -> (r, is @ rem)
+      | l, [] -> (r @ l, rem)
+
+    let sub_from_intervals cuboids to_remove =
+      sub ([], []) cuboids to_remove |> fst
+
+    let reboot l =
+      let l =
+        List.fold_left
+          (fun (i, on_intervals) (status, x, y, z) ->
+            ( i + 1,
+              match status with
+              | On ->
+                  Format.eprintf "Add %d %d@." i (List.length on_intervals);
+                  add_to_intervals on_intervals [ (x, y, z) ]
+              | Off ->
+                  Format.eprintf "Sub %d %d @." i (List.length on_intervals);
+                  sub_from_intervals on_intervals [ (x, y, z) ] ))
+          (0, []) l
+        |> snd
+      in
+      List.fold_left (fun acc (x, y, z) -> acc + (card x * card y * card z)) 0 l
+  end
+
+  let run () =
+    (* 1201259791805392 *)
+    let steps = parse "day22.txt" in
+    Format.eprintf "part2:%d@." (Part2.reboot steps)
+end
 
 module Day21 = struct
   let nroll_by_turn = 3

@@ -1,3 +1,5 @@
 module Prev = Previous_days
+open Lib
+open Format
 
-let () = Prev.Day21.run ()
+let () = Prev.Day25.run ()
