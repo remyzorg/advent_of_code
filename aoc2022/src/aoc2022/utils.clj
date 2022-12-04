@@ -4,6 +4,9 @@
    [clojure.string :as str]
    ))
 
-(defn reduce-file [file init f]
+(defn reduce-file [f file init]
   (with-open [rdr (io/reader file)]
     (reduce f init (line-seq rdr))))
+
+(defn lines [file]
+  (str/split-lines (slurp file)))

@@ -2,6 +2,8 @@
   (:gen-class)
   (:require
    [clojure.java.io :refer [resource] :as io]
+   [clojure.string :as str]
+   [aoc2022.utils :as u]
    ))
 
 (defn day1_1 [file]
@@ -32,7 +34,7 @@
             (let [a (mod3 (inc (int (get line 0))))
                   p  (mod3 (+ 2 (int (get line 2))))]
               (+ total (inc p) (score-mod a p))))]
-    (utils/reduce-file file 0 f)))
+    (u/reduce-file f file 0)))
 
 (defn day2_2 [file]
   (let [f
@@ -42,7 +44,7 @@
                 a-mod (case p 0 (mod3 (- a 1)) 1 a (mod3 (+ a 1)))
                 p-mult (* p 3)]
             (+ total p-mult (inc a-mod))))]
-    (utils/reduce-file file 0 f)))
+    (u/reduce-file f file 0 )))
 
 (defn priority [letter]
   (if (>= (int letter) 97)
@@ -61,15 +63,16 @@
           (set (str-second-half s)))))
 
 (defn day3_1 [file]
-  (utils/reduce-file
-   file 0 (fn [total line]
-            (+ (priority (common-letter line)) total))))
+  (u/reduce-file
+   (fn [total line]
+     (+ (priority (common-letter line)) total))
+   file 0 ))
 
 (defn- common-letter [s1 s2 s3]
   (first (clojure.set/intersection (set s1) (set s2) (set s3))))
 
 (defn day3_2 [file]
-  (let [lines (utils/reduce-file file '() conj)]
+  (let [lines (u/reduce-file conj file '())]
     ;; (prn lines)
     (loop [[hd1 hd2 hd3 & tl] lines, total 0]
       (if hd1
@@ -80,18 +83,17 @@
 (defn day4_1 [file]
   (let [f (fn [total line]
             (let [[s1 e1 s2 e2]
-                  (map read-string (map first (re-seq #"(\d+)" line)))]
+                  (map (comp read-string first) (re-seq #"(\d+)" line))]
               (cond
                 (and (<= s1 s2) (>= e1 e2)) (+ total 1)
                 (and (<= s2 s1) (>= e2 e1)) (+ total 1)
                 :else total
                 )))]
-    (utils/reduce-file file 0 f)))
+    (u/reduce-file f file 0)))
 
 (defn day4_2 [file]
-  (let [f (fn [total line]
-            (let [[s1 e1 s2 e2]
-                  (map read-string (map first (re-seq #"(\d+)" line)))]
-              (+ total (if (<= (max s1 s2) (min e1 e2)) 1 0))
-              ))]
-    (utils/reduce-file file 0 f)))
+  (reduce
+   #(let [[s1 e1 s2 e2] (map read-string (str/split %2 #",|-"))]
+      (+ %1 (if (<= (max s1 s2) (min e1 e2)) 1 0)))
+   0 (u/lines file)))
+
