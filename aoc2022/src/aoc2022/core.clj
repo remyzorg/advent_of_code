@@ -7,6 +7,4 @@
    [aoc2022.old :as old]
   ))
 
-
-(old/day2_2 (resource "day2.input"))
-
+;; (day4_2 (resource "day4.input"))
