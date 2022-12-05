@@ -8,4 +8,5 @@
   ))
 
 
-;; (day5_1 (resource "day5.input"))
+
+(day5_1_2 (resource "day5.input"))

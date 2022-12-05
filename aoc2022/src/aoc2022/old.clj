@@ -98,7 +98,8 @@
    0 (u/lines file)))
 
 (defn- parse-crates [l stacks]
-  (let [new_crates (map #(get % 2) (re-seq #"( {3}|\[(\w)\]) ?" l))
+  ;; either 3 spaces or [word], followed by a space
+  (let [new_crates (map #(get % 2) (re-seq #"(\s{3}|\[(\w)\])\s?" l))
         stacks (if (empty? stacks) (map (fn [_] '()) new_crates) stacks)]
     (map cons new_crates stacks)))
 
@@ -108,24 +109,25 @@
 (defn- parse-all [file]
   (reduce (fn [[stacks moves] line]
             (cond
+              ;; if it starts with m, we consider it to be a move
               (= (get line 0) \m) (list stacks (cons (parse-move line) moves))
+              ;; if it contains a [, it is a crates line
               (str/includes? line "[") (list (parse-crates line stacks) moves)
               :else (list stacks moves)))
           (list '() '()) (u/lines file)))
 
 (defn day5_1_2 [file]
-  (let [[stacks moves] (parse-all file)
-        stacks (map #(filter (fn [v] v) %) stacks)
-        stacks (map reverse stacks)
-        stacks (into [] stacks)
-        stacks
-        (reduce (fn [stacks [amount from to]]
-                  (let [[to from] (list (dec to) (dec from))
-                        elts (take amount (get stacks from))
-                        from_l (drop amount (get stacks from))
-                        to_l (concat elts (get stacks to))]
-                    (assoc (assoc stacks from from_l) to to_l)))
-                stacks (reverse moves))
-        ]
-    (map first stacks)))
-
+  (let [[stacks moves] (parse-all file)]
+    (->> stacks
+         (map (partial filter (fn [v] v))) ;; remove nil put by parse-crates
+         (map reverse) ;; recursion put stacks in the wrong order
+         (into [])
+         (#(reduce
+            (fn [stacks [amount from to]]
+              (let [[to from] (list (dec to) (dec from))
+                    elts (take amount (get stacks from)) ;; read stack `from`
+                    from_l (drop amount (get stacks from)) ;; delete elements from `from`
+                    to_l (concat elts (get stacks to))] ;; reverse elts to get 1
+                (-> stacks (assoc to to_l) (assoc from from_l))))
+            % (reverse moves)))
+         (map first))))
