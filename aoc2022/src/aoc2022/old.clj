@@ -97,3 +97,35 @@
       (+ %1 (if (<= (max s1 s2) (min e1 e2)) 1 0)))
    0 (u/lines file)))
 
+(defn- parse-crates [l stacks]
+  (let [new_crates (map #(get % 2) (re-seq #"( {3}|\[(\w)\]) ?" l))
+        stacks (if (empty? stacks) (map (fn [_] '()) new_crates) stacks)]
+    (map cons new_crates stacks)))
+
+(defn- parse-move [l]
+  (map #(-> % first read-string) (re-seq #"(\d+)" l)))
+
+(defn- parse-all [file]
+  (reduce (fn [[stacks moves] line]
+            (cond
+              (= (get line 0) \m) (list stacks (cons (parse-move line) moves))
+              (str/includes? line "[") (list (parse-crates line stacks) moves)
+              :else (list stacks moves)))
+          (list '() '()) (u/lines file)))
+
+(defn day5_1_2 [file]
+  (let [[stacks moves] (parse-all file)
+        stacks (map #(filter (fn [v] v) %) stacks)
+        stacks (map reverse stacks)
+        stacks (into [] stacks)
+        stacks
+        (reduce (fn [stacks [amount from to]]
+                  (let [[to from] (list (dec to) (dec from))
+                        elts (take amount (get stacks from))
+                        from_l (drop amount (get stacks from))
+                        to_l (concat elts (get stacks to))]
+                    (assoc (assoc stacks from from_l) to to_l)))
+                stacks (reverse moves))
+        ]
+    (map first stacks)))
+
