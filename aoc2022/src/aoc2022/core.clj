@@ -8,5 +8,12 @@
   ))
 
 
+;; Pour Aurore.
+(defn day6_1 [file]
+  (loop [[a & [b c d & _ :as rest]] (seq (first (u/lines file))) counter 0]
+    (if (= (count (set [a b c d])) 4)
+      (+ counter 4)
+      (recur rest (inc counter)))
+    ))
 
-(day5_1_2 (resource "day5.input"))
+(day6_1 (resource "day6.input"))
