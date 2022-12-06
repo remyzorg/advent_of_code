@@ -131,3 +131,21 @@
                 (-> stacks (assoc to to_l) (assoc from from_l))))
             % (reverse moves)))
          (map first))))
+
+;; Pour Aurore.
+(defn day6_1 [file]
+  (loop [[a & [b c d & _ :as rest]] (seq (first (u/lines file)))
+         counter 4]
+    (if (= (count (set [a b c d])) 4)
+      counter
+      (recur rest (inc counter)))
+    ))
+
+;; Pour Aurore.
+(defn day6_2 [file nbchar]
+  (loop [[_ & rest :as line ] (seq (first (u/lines file)))
+         counter nbchar]
+    (if (= (count (set (take nbchar line))) nbchar)
+      counter
+      (recur rest (inc counter)))
+    ))
