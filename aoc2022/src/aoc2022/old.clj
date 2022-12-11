@@ -6,6 +6,8 @@
    [aoc2022.utils :as u]
    ))
 
+;; DAY 1
+
 (defn day1_1 [file]
   (with-open [rdr (io/reader file)]
     (loop [[hd & tl] (line-seq rdr) cur 0 mx 0]
@@ -22,6 +24,8 @@
             (recur tl 0 (take 3 (sort > (cons cur mxs))))
             (recur tl (+ cur (read-string hd)) mxs))))))
 
+;; DAY 2
+
 (defn mod3 [n] (mod n 3))
 
 (defn- score-mod [a p]
@@ -29,12 +33,14 @@
         (= (mod3 (inc a)) p) 6
         :else 0))
 
+
 (defn day2_1 [file]
   (let [f (fn [total line]
             (let [a (mod3 (inc (int (get line 0))))
                   p  (mod3 (+ 2 (int (get line 2))))]
               (+ total (inc p) (score-mod a p))))]
     (u/reduce-file f file 0)))
+
 
 (defn day2_2 [file]
   (let [f
@@ -45,6 +51,8 @@
                 p-mult (* p 3)]
             (+ total p-mult (inc a-mod))))]
     (u/reduce-file f file 0 )))
+
+;; DAY 3
 
 (defn priority [letter]
   (if (>= (int letter) 97)
@@ -80,6 +88,8 @@
         total))
     ))
 
+;; DAY 4
+
 (defn day4_1 [file]
   (let [f (fn [total line]
             (let [[s1 e1 s2 e2]
@@ -96,6 +106,8 @@
    #(let [[s1 e1 s2 e2] (map read-string (str/split %2 #",|-"))]
       (+ %1 (if (<= (max s1 s2) (min e1 e2)) 1 0)))
    0 (u/lines file)))
+
+;; DAY 5
 
 (defn- parse-crates [l stacks]
   ;; either 3 spaces or [word], followed by a space
@@ -132,6 +144,8 @@
             % (reverse moves)))
          (map first))))
 
+;; DAY 6
+
 ;; Pour Aurore.
 (defn day6_1 [file]
   (loop [[a & [b c d & _ :as rest]] (seq (first (u/lines file)))
@@ -148,4 +162,92 @@
     (if (= (count (set (take nbchar line))) nbchar)
       counter
       (recur rest (inc counter)))
+    ))
+
+
+;; DAY 7
+
+(defn- dir? [l] (not (seq? l)))
+
+(defn- size [l] (second l))
+
+(defn- seq-or-val [v] (if (seq? v) (first v) v))
+
+(defn- concat-path [path]
+  (str/join "/" (reverse path)))
+
+(defn- get-depth [s]
+  (- (count (str/split s #"/")) 2))
+
+(defn- traversal [depth sum res [line & tl :as lines]]
+  (do
+    (cond
+      (not line)
+      (list res sum tl)
+
+      (< (get-depth (seq-or-val line)) depth)
+      (do
+        (list (if (< sum 100000) (+ sum res) res) sum lines)
+        )
+
+      (dir? line)
+      (let [[res dir-sum tl] (traversal (inc depth) 0 res tl)]
+        (traversal depth (+ dir-sum sum) res tl))
+      :else (traversal depth (+ (size line) sum) res tl))
+    )
+  )
+
+(defn- read-commands [file]
+  (loop [[line & lines] (u/lines file)
+         pwd '()
+         files '()]
+    (if line
+      (let [[hd hd2 arg rest] (str/split line #" ")]
+        (cond
+          (= hd "$") (case hd2
+                       "cd" (if (= arg "..")
+                              (recur lines (drop 1 pwd) files)
+                              (recur lines (cons arg pwd) files))
+                       "ls" (recur lines pwd files))
+          (= hd "dir") (recur lines pwd (cons (concat-path (cons hd2 pwd)) files))
+          :else (recur lines pwd
+                       (cons
+                        (list (concat-path (cons hd2 pwd)) (read-string hd) )
+                        files))
+          ))
+      files)))
+
+(defn- sort-files [files]
+  (sort (fn [f1 f2] (compare (seq-or-val f1) (seq-or-val f2))) files))
+
+(defn day7-1 [file]
+  (let [files (sort-files (read-commands file))]
+    (println (traversal 1 0 0 files))
+    ))
+
+(defn- traversal [pwd depth sum res [line & tl :as lines]]
+  (do
+    (cond
+      (or (not line) (< (get-depth (seq-or-val line)) depth))
+      (list (cons (list pwd sum) res) sum lines)
+
+      (dir? line)
+      (let [[res dir-sum tl] (traversal line (inc depth) 0 res tl)]
+        (traversal pwd depth (+ dir-sum sum) res tl))
+      :else (traversal pwd depth (+ (size line) sum) res tl))
+    )
+  )
+
+(defn- sort-dirs-by-size [dirs]
+  (sort (fn [f1 f2] (compare (second f1) (second f2))) dirs))
+
+(defn day7-2 [file]
+  (let [files (sort-files (read-commands file))
+        [dirs _ _] (traversal "/" 1 0 '() files)
+        [root total-size] (first dirs)
+        ]
+    (loop [[[d size] & rest] (sort-dirs-by-size dirs)]
+      (if (and (not (= d root)) (> (- 70000000 (- total-size size)) 30000000))
+        (list d size)
+        (recur rest)))
     ))

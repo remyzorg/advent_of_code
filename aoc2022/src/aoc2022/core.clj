@@ -8,4 +8,5 @@
   ))
 
 
-;; (day6_2 (resource "day6.input") 14)
+
+;; (day7-2 (resource "day7.input"))
