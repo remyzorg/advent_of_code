@@ -251,3 +251,43 @@
         (list d size)
         (recur rest)))
     ))
+
+;; DAY 8
+
+(defn- visible-after [len v coord sq]
+  (or (= coord (dec len)) (< (apply max (drop (inc coord) sq)) v)))
+
+(defn- visible-before [v coord sq]
+  (or (= coord 0) (< (apply max (take coord sq)) v)))
+
+(defn- visible [m [x y]]
+  (let [v (mat/mget m x y)
+        col (mat/get-column m y)
+        row (mat/get-row m x)
+        len (count row)]
+    (or (visible-after len v x col) (visible-before v x col)
+     (visible-after len v y row) (visible-before v y row))))
+
+(defn day8-1 [file]
+  (let [m (->> file (u/lines) (map seq)
+           (map (partial map #(read-string (str %))))
+           (mat/matrix))]
+    (println (count (filter (partial visible m) (mat/index-seq m))))))
+
+(defn- first-gt [v sq]
+  (loop [nb 0, [hd & tl] sq]
+    (cond
+      (not hd) nb
+      (<= v hd) (inc nb)
+      :else (recur (inc nb) tl))))
+
+(defn- scenic-score [m [x y]]
+  (let [v (mat/mget m x y), col (mat/get-column m y), row (mat/get-row m x)]
+    (* (first-gt v (drop (inc x) col)) (first-gt v (drop (inc y) row))
+     (first-gt v (reverse (take x col))) (first-gt v (reverse (take y row))))))
+
+(defn day8-2 [file]
+  (let [m (->> file (u/lines) (map seq)
+               (map (partial map #(read-string (str %))))
+               (mat/matrix))]
+    (println (reduce #(max %1 (scenic-score m %2)) 0 (mat/index-seq m)))))

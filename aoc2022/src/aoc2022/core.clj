@@ -3,10 +3,10 @@
   (:require
    [clojure.java.io :refer [resource] :as io]
    [clojure.string :as str]
+   [clojure.core.matrix :as mat]
    [aoc2022.utils :as u]
    [aoc2022.old :as old]
   ))
 
 
-
-;; (day7-2 (resource "day7.input"))
+;; (day8-2 (resource "day8.input"))
