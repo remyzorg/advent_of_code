@@ -3,6 +3,7 @@
   (:require
    [clojure.java.io :refer [resource] :as io]
    [clojure.string :as str]
+   [clojure.core.matrix :as mat]
    [aoc2022.utils :as u]
    ))
 
