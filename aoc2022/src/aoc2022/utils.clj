@@ -23,3 +23,6 @@
     (if hd
       (if (f hd) hd (recur tl))
       nil)))
+
+(defn find-int [s]
+  (read-string (first (re-find #"(\d+)" s))))

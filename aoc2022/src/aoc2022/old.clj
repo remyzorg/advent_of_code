@@ -355,5 +355,111 @@
 
 ;; DAY 10
 
+(defn- parse-line [line]
+  (let [line (str/split line #" ")]
+    (if (= (first line) "noop")
+      [:noop]
+      [:add (read-string (second line))]
+      )))
+
+(defn- find-cycle [cycle next-cycle vs]
+  (u/find-first #(and (<= cycle %) (> next-cycle %)) vs))
+
+(defn build-cycle-values [lines]
+  (loop [[hd & tl] lines, x 1, r '()]
+    (if hd
+      (let [r (case (first hd)
+                :add (cons (+ x (second hd)) (cons x r))
+                :noop (cons x r))]
+        (recur tl (first r) r))
+      (reverse r)
+      )))
+
+(defn day10-1 [file]
+  (let [lines (map parse-line (u/lines file))
+        cycle-values (into [] (build-cycle-values lines))]
+    (reduce (fn [sum v]
+              (+ sum (* v (get cycle-values (- v 1)))))
+            0 [20 60 100 140 180 220])))
 
 
+(defn- get-xy [cycle] [(dec (mod cycle 40)) (quot cycle 40)])
+
+(defn- init-mat []
+  (mat/fill! (mat/mutable (mat/new-matrix 6 40)) "."))
+
+(defn day10-2 [file]
+  (let [cycle-values (build-cycle-values (map parse-line (u/lines file)))
+        m (init-mat)]
+    (doseq [[i v] (map-indexed vector cycle-values)]
+      (let [[x y] (get-xy (inc i))]
+        (if (or (= v x) (= v (inc x)) (= v (+ x 2)))
+          (mat/mset! m y x "#")
+          )))
+    (mat/pm m)))
+
+;; DAY 11
+
+(defn- parse-monkey [m]
+  (let [[num items op test iftrue iffalse] (str/split m #"\n")
+        num (find-int num)
+        items (into [] (map #(-> % first read-string) (re-seq #"(\d+)" items)))
+        [[_ op rhs]] (re-seq #"(\*|\+) (\d+|old)" op)
+        op (cond
+                (= rhs "old") (fn [x] (* x x))
+                (= op "*") #(* % (read-string rhs))
+                (= op "+") #(+ % (read-string rhs)))
+        test (u/find-int test)
+        iftrue (u/find-int iftrue)
+        iffalse (u/find-int iffalse)
+        ]
+    {:num num :items items :op op :test test :iftrue iftrue :iffalse iffalse}
+    ))
+
+(defn- play-item [mod-test m wl]
+  (let [wl ((get m :op) wl),
+        ;; wl (quot wl 3),
+        wl (mod wl mod-test),
+        send-target
+        (if (= (mod wl (get m :test)) 0) (get m :iftrue) (get m :iffalse))
+        ]
+    [wl send-target]))
+
+(defn- add-item [m wl]
+  (assoc m :items (conj (get m :items) wl)))
+
+(defn- remove-items [m]
+  (assoc m :items []))
+
+(defn- play-round [mod-test monkey monkeys]
+  (->> (get monkey :items)
+       (reduce (fn [monkeys item]
+                 (let [[wl send-target] (play-item mod-test monkey item)]
+                   (assoc monkeys send-target
+                          (add-item (get monkeys send-target) wl))))
+               monkeys)
+       (#(assoc % (get monkey :num) (remove-items monkey)))))
+
+(defn- print-items [m]
+  (println "Monkey" (get m :num) "has" (get m :items)))
+
+(defn- update-monkey-biz [mbz id m]
+  (assoc mbz id (+ (get mbz id) (count (get m :items)))))
+
+(defn- play-turn [mod-test mbz monkeys]
+   (reduce (fn [[mbz monkeys] id]
+            (let [m (get monkeys id)]
+              [(update-monkey-biz mbz id m) (play-round mod-test m monkeys)]))
+            [mbz monkeys] (range 0 (count monkeys))))
+
+(defn- play-turns [mod-test mbz monkeys n]
+  (reduce (fn [[mbz monkeys] _] (play-turn mod-test mbz monkeys))
+          [mbz monkeys] (range 0 n)))
+
+(defn day11-1 [file]
+  (let [monkeys (into [] (map parse-monkey (str/split (slurp file) #"\n\n")))
+        mod-test (reduce * 1 (map #(get % :test) monkeys))
+        monkey-biz (into [] (repeat (count monkeys) 0))
+        [monkey-biz monkeys] (play-turns mod-test monkey-biz monkeys 10000)]
+    (println "AFTER 10000 ROUNDs")
+    (doseq [m monkey-biz] (println m))))
