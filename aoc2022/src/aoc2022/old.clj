@@ -402,7 +402,7 @@
 
 (defn- parse-monkey [m]
   (let [[num items op test iftrue iffalse] (str/split m #"\n")
-        num (find-int num)
+        num (u/find-int num)
         items (into [] (map #(-> % first read-string) (re-seq #"(\d+)" items)))
         [[_ op rhs]] (re-seq #"(\*|\+) (\d+|old)" op)
         op (cond
@@ -463,3 +463,5 @@
         [monkey-biz monkeys] (play-turns mod-test monkey-biz monkeys 10000)]
     (println "AFTER 10000 ROUNDs")
     (doseq [m monkey-biz] (println m))))
+
+;; DAY 12
